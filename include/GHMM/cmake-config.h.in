@@ -1,0 +1,3 @@
+#define GHMM_VERSION "@GHMM_VERSION@"
+
+#cmakedefine GHMM_DEBUG
