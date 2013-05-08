@@ -155,7 +155,7 @@ namespace GHMM {
     }
 
     double &p(int s, int t) {
-      return state_log_trans[s * state_count + t];
+      return state_trans[s * state_count + t];
     }
     const double &p(int s, int t) const {
       return state_trans[s * state_count + t];

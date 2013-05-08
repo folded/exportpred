@@ -18,7 +18,8 @@
 // ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
 // CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#include "predict_pexel.hh"
+
+#include "exportpred.hh"
 
 #include <iostream>
 #include <sstream>
@@ -130,60 +131,24 @@ void readFasta(std::istream &in,
 
 
 
-#if VERSION == 1
-
 static int a_spacer_raw_distrib[] = {
-  1, 2, 3, 6, 8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 13, 13, 14, 14,
-  14, 14, 15, 15, 15, 16, 16, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18,
-  18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-  19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-  20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21,
-  21, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 24, 24,
-  24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26,
-  26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27,
-  27, 28, 29, 29, 29, 29, 29, 30, 31, 31, 31, 31, 31, 32, 32, 33, 35,
-  37, 41, 43, 48, 53, 61, 89, 110, 129, 166, 182, 202, 209, 324, 495
+  12, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 22, 22, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 28, 30, 31, 31, 31, 33
 };
 
-#endif
 
-#if VERSION == 2
 
-static int a_spacer_raw_distrib[] = {
-  9, 12, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 16,
-  16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
-  18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-  19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-  20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21,
-  21, 21, 21, 21, 21, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23,
-  24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25,
-  25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26,
-  26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 29, 31, 31, 31, 31, 33,
-  33
-};
-
-#endif
-
-GHMM::Model::Ptr makePEXELmodel() {
+GHMM::Model::Ptr makePEXELmodel(bool signalp_model, const std::string exclude_5) {
   GHMM::UTIL::Alphabet::Ptr alphabet = new GHMM::UTIL::Alphabet();
   alphabet->addCharTokenRange('A','Z');
   GHMM::UTIL::EmissionDistributionParser::Ptr ep = new GHMM::UTIL::EmissionDistributionParser(alphabet);
 
   GHMM::EMISSION::Base::Ptr background, met;
 
-  std::vector<MATH::DPDF::Ptr> RLE(7, MATH::DPDF::Ptr());
-
   GHMM::LENGTH::Discrete::Ptr a_leader_length, a_spacer_length;
 
   GHMM::LENGTH::Geometric::Ptr a_tail_length, c_tail_length;
 
-#if VERSION == 1
-  GHMM::LENGTH::Uniform::Ptr a_hydrophobic_length;
-#endif
-
-#if VERSION == 2
   GHMM::LENGTH::Discrete::Ptr a_hydrophobic_length;
-#endif
 
   a_spacer_length = new GHMM::LENGTH::Discrete(MATH::smooth(MATH::GaussianKernel(1.0),
                                                             a_spacer_raw_distrib,
@@ -191,38 +156,63 @@ GHMM::Model::Ptr makePEXELmodel() {
                                                             1,
                                                             60));
 
-  background = new GHMM::EMISSION::Stateless(ep->parse("\n\
+  MATH::DPDF::Ptr background_distrib = ep->parse("\n\
              A:  78883 C:  71359 D: 260979 E: 288230\n\
              F: 175488 G: 114068 H:  97688 I: 373389\n\
              K: 473828 L: 304967 M:  88773 N: 581084\n\
              P:  80295 Q: 111860 R: 106760 S: 256676\n\
-             T: 164816 V: 154088 W:  19966 Y: 230362"));
+             T: 164816 V: 154088 W:  19966 Y: 230362");
+  background = new GHMM::EMISSION::Stateless(background_distrib);
 
   met = new GHMM::EMISSION::Stateless(ep->parse("M: 1"));
 
-#if VERSION == 1
-  RLE[0] = ep->parse("A: 1 C: 6 D: 2 E: 2 F: 11 G: 7 H: 3 I: 15 K: 23 L: 6 M: 1 N: 15 P: 1 Q: 3 R: 6 S: 38 T: 5 V: 3 W: 1 Y: 6");
-  RLE[1] = ep->parse("K: 3 R: 152");
-  // RLE[2] = ep->parse("I: 28 K: 11 L: 15 N: 32 S: 26 T: 9");
-  RLE[2] = ep->parse("A: 2 C: 6 E: 1 F: 4 H: 3 I: 28 K: 11 L: 15 M: 2 N: 32 Q: 3 R: 3 S: 26 T: 9 V: 6 W: 1 Y: 3");
-  // RLE[3] = ep->parse("L: 151");
-  RLE[3] = ep->parse("F: 1 I: 2 L: 151 N: 1");
-  // RLE[4] = ep->parse("A: 35 S: 48 T: 18 Y: 15 C: 9");
-  RLE[4] = ep->parse("A: 35 C: 9 E: 2 F: 2 G: 5 H: 1 I: 2 K: 1 L: 3 N: 7 S: 48 T: 18 V: 7 Y: 15");
-  // RLE[5] = ep->parse("D: 11 E: 109 Q: 21");
-  RLE[5] = ep->parse("C: 2 D: 11 E: 109 G: 2 H: 1 K: 1 Q: 21 S: 4 T: 3 Y: 1");
-  RLE[6] = ep->parse("A: 1 C: 4 D: 1 E: 6 F: 5 G: 6 H: 7 I: 5 K: 10 L: 14 M: 3 N: 15 P: 9 Q: 3 R: 5 S: 10 T: 17 V: 18 Y: 16");
-#endif
+  std::vector<MATH::DPDF::Ptr> RLE;
+  std::ostringstream pos5;
+#define ADD5(ch, count) do { if (exclude_5.find(ch) == std::string::npos) { pos5 << ch << ": " << count << " "; } } while(0)
+  ADD5('C', 1);
+  ADD5('D', 14);
+  ADD5('E', 100);
+  ADD5('F', 1);
+  ADD5('G', 2);
+  ADD5('H', 1);
+  ADD5('I', 1);
+  ADD5('K', 2);
+  ADD5('L', 1);
+  ADD5('M', 1);
+  ADD5('N', 2);
+  ADD5('P', 1);
+  ADD5('Q', 22);
+  ADD5('R', 1);
+  ADD5('S', 6);
+  ADD5('T', 4);
+  ADD5('V', 1);
+  ADD5('W', 1);
+  ADD5('Y', 2);
+  std::string pos5str = pos5.str();
 
-#if VERSION == 2
-  RLE[0] = ep->parse("M: 1 P: 1 W: 1 A: 2 D: 2 E: 2 H: 3 Q: 3 V: 4 T: 5 C: 6 Y: 6 G: 7 L: 7 R: 7 F: 13 I: 15 N: 15 K: 26 S: 40");
-  RLE[1] = ep->parse("K: 7 R: 159");
-  RLE[2] = ep->parse("W: 1 A: 2 E: 2 M: 2 H: 3 R: 3 Q: 4 Y: 4 F: 5 V: 6 C: 7 T: 9 K: 12 L: 16 S: 28 I: 29 N: 33");
-  RLE[3] = ep->parse("N: 1 F: 2 I: 2 L: 161");
-  RLE[4] = ep->parse("E: 1 H: 1 F: 2 I: 2 K: 3 L: 3 G: 4 N: 8 V: 8 C: 10 Y: 17 T: 18 A: 37 S: 52");
-  RLE[5] = ep->parse("H: 1 K: 1 Y: 1 C: 2 G: 3 T: 3 S: 5 D: 15 Q: 21 E: 114");
-  RLE[6] = ep->parse("D: 1 A: 3 M: 3 Q: 3 C: 4 F: 5 R: 5 G: 6 I: 6 E: 7 H: 8 P: 9 K: 10 S: 11 L: 15 N: 17 T: 17 Y: 17 V: 19");
-#endif
+  ep->parseMotif(std::back_inserter(RLE),
+      "A: 6 C: 10 D: 7 E: 7 F: 16 G: 12 H: 8 I: 18 K: 28 L: 11 M: 6 N: 20 P: 6 Q: 8 R: 9 S: 38 T: 10 V: 8 W: 6 Y: 11",
+      "R: 145",
+      "A: 3 C: 7 D: 1 E: 2 F: 5 G: 1 H: 4 I: 26 K: 11 L: 15 M: 4 N: 26 P: 1 Q: 4 R: 4 S: 27 T: 10 V: 7 W: 2 Y: 5",
+      "L: 1",
+      "A: 33 C: 9 D: 1 E: 2 F: 3 G: 5 H: 2 I: 3 K: 2 L: 4 M: 1 N: 7 P: 1 Q: 1 R: 1 S: 48 T: 19 V: 8 W: 1 Y: 14",
+      // "C: 1 D: 14 E: 100 F: 1 G: 2 H: 1 I: 1 K: 2 L: 1 M: 1 N: 2 P: 1 Q: 22 R: 1 S: 6 T: 4 V: 1 W: 1 Y: 2",
+      pos5str.c_str(),
+      "A: 7 C: 9 D: 6 E: 7 F: 10 G: 10 H: 13 I: 10 K: 15 L: 17 M: 7 N: 21 P: 13 Q: 8 R: 10 S: 16 T: 21 V: 21 W: 5 Y: 19",
+      NULL);
+
+  std::vector<MATH::DPDF::Ptr> RLE_late;
+  ep->parseMotif(std::back_inserter(RLE_late),
+      "A: 6 C: 10 D: 7 E: 7 F: 16 G: 12 H: 8 I: 18 K: 28 L: 11 M: 6 N: 20 P: 6 Q: 8 R: 9 S: 38 T: 10 V: 8 W: 6 Y: 11",
+      "R: 145",
+      "A: 3 C: 7 D: 1 E: 2 F: 5 G: 1 H: 4 I: 26 K: 11 L: 15 M: 4 N: 26 P: 1 Q: 4 R: 4 S: 27 T: 10 V: 7 W: 2 Y: 5",
+      "L: 1",
+      "A: 33 C: 9 D: 1 E: 2 F: 3 G: 5 H: 2 I: 3 K: 2 L: 4 M: 1 N: 7 P: 1 Q: 1 R: 1 S: 48 T: 19 V: 8 W: 1 Y: 14",
+      "A: 33 C: 9 D: 1 E: 2 F: 3 G: 5 H: 2 I: 3 K: 2 L: 4 M: 1 N: 7 P: 1 Q: 1 R: 1 S: 48 T: 19 V: 8 W: 1 Y: 14",
+      // "C: 1 D: 14 E: 100 F: 1 G: 2 H: 1 I: 1 K: 2 L: 1 M: 1 N: 2 P: 1 Q: 22 R: 1 S: 6 T: 4 V: 1 W: 1 Y: 2",
+      pos5.str().c_str(),
+      "A: 7 C: 9 D: 6 E: 7 F: 10 G: 10 H: 13 I: 10 K: 15 L: 17 M: 7 N: 21 P: 13 Q: 8 R: 10 S: 16 T: 21 V: 21 W: 5 Y: 19",
+      NULL);
 
   a_tail_length = new GHMM::LENGTH::Geometric(364);
 
@@ -231,6 +221,7 @@ GHMM::Model::Ptr makePEXELmodel() {
   GHMM::StateBase::Ptr a_met = GHMM::UTIL::makeState(NULL, met);
   GHMM::StateBase::Ptr a_spacer = GHMM::UTIL::makeState(a_spacer_length, background);
   GHMM::StateBase::Ptr a_RLE = GHMM::UTIL::makeMotifState(RLE);
+  GHMM::StateBase::Ptr a_RLE_late = GHMM::UTIL::makeMotifState(RLE_late);
   GHMM::StateBase::Ptr a_tail = GHMM::UTIL::makeState(a_tail_length, background);
 
   GHMM::StateBase::Ptr c_met = GHMM::UTIL::makeState(NULL, met);
@@ -241,39 +232,37 @@ GHMM::Model::Ptr makePEXELmodel() {
   std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHMM::UTIL::Alphabet::Ptr &alphabet);
   std::pair<std::string, std::string> makeSSModel(GHMM::ModelBuilder &mb, GHMM::UTIL::Alphabet::Ptr &alphabet);
 
-#ifdef SIGNALP_MODEL
-  std::pair<std::string, std::string> ss_states = makeSignalPModel(mb, alphabet);
-#else
-  std::pair<std::string, std::string> ss_states = makeSSModel(mb, alphabet);
-#endif
+  std::pair<std::string, std::string> ss_states;
+  if (signalp_model) {
+    ss_states = makeSignalPModel(mb, alphabet);
+  } else {
+    ss_states = makeSSModel(mb, alphabet);
+  }
 
-#ifdef RLE_PATTERN
   mb.addState("a-met",         a_met);
   mb.addState("a-spacer",      a_spacer);
   mb.addState("a-RLE",         a_RLE);
+  mb.addState("a-RLE-late",    a_RLE_late);
   mb.addState("a-tail",        a_tail);
-#endif
 
   mb.addState("c-met",         c_met);
   mb.addState("c-tail",        c_tail);
 
-#ifdef RLE_PATTERN
   mb.addStateTransition(GHMM::Model::BEGIN, "a-met", 400);
-#endif
 
   mb.addStateTransition(GHMM::Model::BEGIN, "c-met", 5009);
 
-#ifdef RLE_PATTERN
   mb.addStateTransition("a-met",            ss_states.first,  1);
   mb.addStateTransition(ss_states.second,   "a-spacer",       1);
-  mb.addStateTransition("a-spacer",         "a-RLE",          1);
+  mb.addStateTransition("a-spacer",         "a-RLE",          100);
+  mb.addStateTransition("a-spacer",         "a-RLE-late",     5);
   mb.addStateTransition("a-RLE",            "a-tail",         1);
+  mb.addStateTransition("a-RLE-late",       "a-tail",         1);
   mb.addStateTransition("a-tail",           GHMM::Model::END, 1);
 
   mb.addState("d-tail", c_tail);
   mb.addStateTransition(ss_states.second,   "d-tail",         0.01);
   mb.addStateTransition("d-tail",           GHMM::Model::END, 1);
-#endif
 
   mb.addStateTransition("c-met",            "c-tail",         1);
   mb.addStateTransition("c-tail",           GHMM::Model::END, 1);
@@ -282,12 +271,21 @@ GHMM::Model::Ptr makePEXELmodel() {
 }
 
 static const struct option options[] = {
+//{ "signalp",           no_argument,                0,            's' },
   { "input",             required_argument,          0,            'i' },
+  { "exclude-5",         required_argument,          0,            '5' },
   { "output",            required_argument,          0,            'o' },
   { "RLE-threshold",     required_argument,          0,            'R' },
-  { "no-RLD",            no_argument,                0,            'r' },
   { 0,                   0,                          0,            0   }
 };
+
+bool parseContainsState(const GHMM::Model::Ptr &model, int state, GHMM::Traceback::Ptr tbp) {
+  while (tbp != NULL) {
+    if (tbp->state == state) return true;
+    tbp = tbp->prev;
+  }
+  return false;
+}
 
 std::string genParse(const std::string &sequence, const GHMM::Model::Ptr &model, GHMM::Traceback::Ptr tbp) {
   std::ostringstream out;
@@ -306,28 +304,36 @@ std::string genParse(const std::string &sequence, const GHMM::Model::Ptr &model,
 
 void usage(const char *progname) {
   std::cout << "Usage: " << progname << " [arguments]" << std::endl;
+
   std::cout << "\
 \n\
 --input=file            -i file        read sequences from file (-:stdin)\n\
 --output=file           -o file        write results to file (-:stdout)\n\
 --RLE-threshold=float   -R float       RLE threshold for positive prediction\n\
-                                       (default: 4.3)\n\
---no-RLE                -r             turn off RLE prediction\n\
+                                       (default: 0.0)\n\
+--exclude-5             -5 str         exclude given residues in position 5\n\
 \n\
 ";
+//--signalp               -s             use SignalP-based HMM for SS prediction
+//                                       (default: off)
 }
 
 int main(int argc, char **argv) {
-  double RLE_threshold = 4.3;
-  bool do_RLE = true;
+  double RLE_threshold = 0.0;
 
   std::list<std::pair<std::string, std::string> > seq_list;
   std::string output = "-";
 
   int ch;
+  bool signalp_model = false;
+  std::string exclude_5;
 
-  while ((ch = getopt_long(argc, argv, "i:o:R:K:hkr", options, NULL)) != -1) {
+  while ((ch = getopt_long(argc, argv, "i:o:R:K:hkr" /* "s" */, options, NULL)) != -1) {
     switch (ch) {
+//     case 's': {
+//       signalp_model = true;
+//       break;
+//     }
     case 'i': {
       if (!strcmp(optarg, "-")) {
         std::ifstream in(optarg);
@@ -342,16 +348,16 @@ int main(int argc, char **argv) {
       }
       break;
     }
+    case '5': {
+      exclude_5 += optarg;
+      break;
+    }
     case 'o': {
       output = optarg;
       break;
     }
     case 'R': {
       RLE_threshold = strtod(optarg, NULL);
-      break;
-    }
-    case 'r': {
-      do_RLE = false;
       break;
     }
     case 'h':
@@ -362,7 +368,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  GHMM::Model::Ptr model = makePEXELmodel();
+  GHMM::Model::Ptr model = makePEXELmodel(signalp_model, exclude_5);
 
   std::list<std::pair<std::string, std::string> >::iterator i, e;
 
@@ -383,7 +389,6 @@ int main(int argc, char **argv) {
 
     GHMM::Parse::Ptr parse = new GHMM::Parse();
     parse->parse(model, seq_raw, seq_raw + sequence.size());
-
     double alpha_rle, alpha_bkg;
     alpha_rle = parse->alpha(model->stateNumber("a-tail"), 0);
     alpha_bkg = parse->alpha(model->stateNumber("c-tail"), 0);
@@ -396,9 +401,18 @@ int main(int argc, char **argv) {
 
     if (alpha_rle - alpha_bkg > RLE_threshold) {
       std::ostringstream out;
+      const double mu = 15.55600978;
+      const double lambda = 0.08604353;
+
+      double x =  alpha_rle - alpha_bkg;
+      double px = exp(-exp(-lambda * -x * mu));
       out << name << "\t"
-          << "RLE" << "\t"
+          << (parseContainsState(model,
+                                 model->stateNumber("a-RLE-late"),
+                                 parse->psi(model->stateNumber("a-tail"), 0)) ?
+              "RLE-late" : "RLE") << "\t"
           << alpha_rle - alpha_bkg << "\t"
+          << px << "\t"
           << genParse(sequence, model, parse->psi(model->stateNumber("a-tail"), 0));
       rle_out.push_back(std::make_pair(alpha_rle - alpha_bkg, out.str()));
     }

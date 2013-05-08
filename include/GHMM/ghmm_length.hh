@@ -110,6 +110,7 @@ namespace GHMM {
         p_self = p;
       }
       void setMean(double mean) {
+        // mean = p_self / (1 - p_self)
         p_self = mean / (1 + mean);
       }
 

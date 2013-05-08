@@ -105,6 +105,17 @@ namespace GHMM {
       virtual ~EmissionDistributionParser() {
       }
 
+      template<typename iter_t>
+      void parseMotif(iter_t out_iter, ...) {
+        const char *distrib;
+        va_list args;
+        va_start(args, out_iter);
+        while ((distrib = va_arg(args, const char *)) != NULL) {
+          *out_iter++ = parse(distrib);
+        }
+        va_end(args);
+      }
+
       virtual MATH::DPDF::Ptr parse(std::istream &in) {
         MATH::DPDF::Ptr result = new MATH::DPDF();
         result->setDistrib(alphabet->size(), 0.0);
@@ -124,6 +135,7 @@ namespace GHMM {
             result->setp(idx, freq);
           }
           if (in.fail()) return NULL;
+          while (!in.eof() && std::isspace(in.peek())) in.get();
         }
         result->normalize();
         return result;

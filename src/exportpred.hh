@@ -5,13 +5,6 @@
 #include <utility>
 #include <GHMM/ghmm.hh>
 
-#define RLE_PATTERN
-#define KLD_PATTERN
-
-
-// #define VERSION 1
-#define VERSION 2
-
 // #define SIGNALP_MODEL
 
 #define ARRAYLEN(x) (sizeof(x) / sizeof(x[0]))

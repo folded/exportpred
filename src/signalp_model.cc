@@ -18,18 +18,31 @@
 // ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
 // CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#include "predict_pexel.hh"
+
+#include "exportpred.hh"
+
+static int leader_raw_distrib[] = {
+  1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4, 4, 4, 4, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 10, 11, 12, 12, 12, 12, 13, 13, 13, 14, 15, 15, 15, 16, 16, 17, 19, 19, 20, 20, 23, 24, 25, 25, 26, 26, 28, 28, 28, 28, 29, 29, 29, 32, 35, 37, 37, 37, 39, 39, 40, 42, 43, 43, 46, 47, 48, 48, 49, 49, 49, 49, 49, 49, 49, 50, 50, 50, 50, 50, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 52, 52, 52, 52, 52, 52, 53, 53, 54, 58
+};
 
 std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHMM::UTIL::Alphabet::Ptr &alphabet) {
   GHMM::UTIL::EmissionDistributionParser::Ptr ep = new GHMM::UTIL::EmissionDistributionParser(alphabet);
 
-  GHMM::EMISSION::Base::Ptr a_emit, h1_emit, cloop_emit, c6_emit, c5_emit, c4_emit, c3_emit, c2_emit, c1_emit, cut_emit;
+  GHMM::LENGTH::Discrete::Ptr leader_length;
 
-  a_emit = new GHMM::EMISSION::Stateless(ep->parse("\n\
-        A:0.0669576 C:0.0289179 D:0.0330147 E:0.06290 68:0.629 F:0.040006:0.353\n\
-        G:0.0611961 H:0.022283  I:0.0269273 K:0.0721042 L:0.101807\n\
-        M:0.0147688 N:0.0299838 P:0.0741557 Q:0.0418068 R:0.119932\n\
-        S:0.0804025 T:0.0474921 V:0.0344917 W:0.0186883 Y:0.0221576"));
+  leader_length = new GHMM::LENGTH::Discrete(MATH::smooth(MATH::GaussianKernel(2.0),
+                                                            leader_raw_distrib,
+                                                            ENDOF(leader_raw_distrib),
+                                                            1,
+                                                            80));
+
+  GHMM::EMISSION::Base::Ptr ss_leader, h1_emit, cloop_emit, c6_emit, c5_emit, c4_emit, c3_emit, c2_emit, c1_emit, cut_emit, m2_emit, m3_emit, m4_emit;
+
+  ss_leader = new GHMM::EMISSION::Stateless(ep->parse("\n\
+             W:  20 P:  44 A:  52 Q:  73 H:  74 G:  90\n \
+             D: 103 V: 109 M: 111 C: 116 T: 127 E: 156\n\
+             R: 191 L: 239 F: 248 Y: 274 I: 285 S: 366\n\
+             N: 516 K: 639"));
 
   h1_emit = new GHMM::EMISSION::Stateless(ep->parse("\n\
     A:0.118119 C:0.03861 D:0.000595187 E:0.00177443 F:0.0767409\n\
@@ -83,27 +96,44 @@ std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHM
     M:0.0128499 N:0.0274769 P:0.00634449 Q:0.111559 R:0.0426487\n\
     S:0.0832117 T:0.0493584 V:0.0492212 W:0.00964942 Y:0.0202909"));
 
+  m2_emit = new GHMM::EMISSION::Stateless(ep->parse("\n\
+    A:0.0456995 C:0.0237105 D:0.0751189 E:0.08413   F:0.0248452\n\
+    G:0.051413  H:0.0264597 I:0.0318314 K:0.0472495 L:0.0444641\n\
+    M:0.0106318 N:0.0445137 P:0.163464  Q:0.0436872 R:0.0427141\n\
+    S:0.0878697 T:0.0580604 V:0.062032  W:0.010595  Y:0.0215103"));
+
+  m3_emit = new GHMM::EMISSION::Stateless(ep->parse("\n\
+    A:0.0625745 C:0.0428642 D:0.0488261 E:0.0590316 F:0.0361364\n\
+    G:0.0541691 H:0.0255112 I:0.0506575 K:0.0386494 L:0.0948476\n\
+    M:0.0180286 N:0.0373809 P:0.0894012 Q:0.0268044 R:0.0352307\n\
+    S:0.0666866 T:0.0788772 V:0.0935886 W:0.0150417 Y:0.0256926"));
+
+  m4_emit = new GHMM::EMISSION::Stateless(ep->parse("\n\
+    A:0.0497625 C:0.0327603 D:0.0570271 E:0.0704681  F:0.0329634\n\
+    G:0.0915992 H:0.0317528 I:0.026768  K:0.0450336  L:0.0559596\n\
+    M:0.0128554 N:0.0405354 P:0.101787  Q:0.0667029  R:0.045044\n\
+    S:0.0859486 T:0.0620253 V:0.0600924 W:0.00752706 Y:0.0233876"));
+
   MATH::DPDF::Ptr h1_dpdf = new MATH::DPDF();
   h1_dpdf->setDistrib(6, 19, (double[]){
-                        6.54977e-16,
-                          3.7347e-12,
-                          1.71429e-05,
-                          0.00274341,
-                          0.000951411,
-                          0.00769368,
-                          0.231647,
-                          0.220435,
-                          0.155337,
-                          0.157697,
-                          0.222918,
-                          0.000560533,
-                          1.92736e-08
-                          });
+      1.92736e-08,
+      0.000560533,
+      0.222918,
+      0.157697,
+      0.155337,
+      0.220435,
+      0.231647,
+      0.00769368,
+      0.000951411,
+      0.00274341,
+      1.71429e-05,
+      3.7347e-12,
+      6.54977e-16
+  });
 
   GHMM::LENGTH::Discrete::Ptr h1_length = new GHMM::LENGTH::Discrete(h1_dpdf);
 
-  GHMM::StateBase::Ptr sp_a1 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(3), a_emit);
-  GHMM::StateBase::Ptr sp_a2 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Geometric(15.61295), a_emit);
+  GHMM::StateBase::Ptr leader =   GHMM::UTIL::makeState(leader_length, ss_leader);
   GHMM::StateBase::Ptr sp_h1 =    GHMM::UTIL::makeState(h1_length, h1_emit);
   GHMM::StateBase::Ptr sp_cloop = GHMM::UTIL::makeState(new GHMM::LENGTH::Geometric(4.155), cloop_emit);
   GHMM::StateBase::Ptr sp_c9 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), cloop_emit);
@@ -116,9 +146,11 @@ std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHM
   GHMM::StateBase::Ptr sp_c2 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), c2_emit);
   GHMM::StateBase::Ptr sp_c1 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), c1_emit);
   GHMM::StateBase::Ptr sp_cut =   GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), cut_emit);
+  GHMM::StateBase::Ptr sp_m2 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), m2_emit);
+  GHMM::StateBase::Ptr sp_m3 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), m3_emit);
+  GHMM::StateBase::Ptr sp_m4 =    GHMM::UTIL::makeState(new GHMM::LENGTH::Fixed(1), m4_emit);
 
-  mb.addState("a1",            sp_a1);
-  mb.addState("a2",            sp_a2);
+  mb.addState("a-leader",      leader);
   mb.addState("h1",            sp_h1);
   mb.addState("cloop",         sp_cloop);
   mb.addState("c9",            sp_c9);
@@ -131,9 +163,11 @@ std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHM
   mb.addState("c2",            sp_c2);
   mb.addState("c1",            sp_c1);
   mb.addState("cut",           sp_cut);
+  mb.addState("m2",            sp_m2);
+  mb.addState("m3",            sp_m3);
+  mb.addState("m4",            sp_m4);
 
-  mb.addStateTransition("a1",            "a2",           0.0217286);
-  mb.addStateTransition("a2",            "h1",           0.0217286);
+  mb.addStateTransition("a-leader",      "h1",           1);
   mb.addStateTransition("h1",            "cloop",        0.0217286);
   mb.addStateTransition("h1",            "c9",           0.057086);
   mb.addStateTransition("h1",            "c8",           0.151762);
@@ -153,7 +187,10 @@ std::pair<std::string, std::string> makeSignalPModel(GHMM::ModelBuilder &mb, GHM
   mb.addStateTransition("c3",            "c2",           1);
   mb.addStateTransition("c2",            "c1",           1);
   mb.addStateTransition("c1",            "cut",          1);
+  mb.addStateTransition("cut",           "m2",           1);
+  mb.addStateTransition("m2",            "m3",           1);
+  mb.addStateTransition("m3",            "m4",           1);
 
   // need to add non-emitting states.
-  return std::make_pair(std::string("a1"), std::string("cut"));
+  return std::make_pair(std::string("a-leader"), std::string("m4"));
 }
