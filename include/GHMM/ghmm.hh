@@ -79,7 +79,7 @@ namespace GHMM {
       __refcount++;
     }
     void decref() const {
-      !--__refcount;
+      --__refcount;
       if (!__refcount) {
         delete this;
       }
